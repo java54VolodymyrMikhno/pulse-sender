@@ -8,7 +8,7 @@ import java.util.stream.IntStream;
 import telran.monitoring.pulse.dto.SensorData;
 
 public class PulseSenderAppl {
-	private static final int N_PACKETS = 100;
+	private static final int N_PACKETS = 50;
 	private static final long TIMEOUT = 500;
 	private static final int N_PATIENTS = 5;
 	private static final int MIN_PULSE_VALUE = 50;
@@ -20,6 +20,8 @@ public class PulseSenderAppl {
 	private static final int MAX_JUMP_PERCENT = 100;
 	private static final int JUMP_POSITIVE_PROB = 70;
 	private static final int PATIENT_ID_PRINTED_VALUES = 3;
+	private static final int MAX_ERROR_PULSE_PROB = 5;
+	private static final int MIN_ERROR_PULSE_PROB = 3;
 	private static Random random = new Random();
 	private static HashMap<Long, Integer> patientIdPulseValue = new HashMap<>();
 	static DatagramSocket socket;
@@ -69,6 +71,11 @@ public class PulseSenderAppl {
 			valueRes = getValueWithJump(valueRes);
 			patientIdPulseValue.put(patientId, valueRes);
 		}
+		if (chance(MAX_ERROR_PULSE_PROB)) {
+            valueRes = MAX_PULSE_VALUE + 10;
+        } else if (chance(MIN_ERROR_PULSE_PROB)) {
+            valueRes = MIN_PULSE_VALUE - 10;
+        }
 
 		return valueRes;
 	}

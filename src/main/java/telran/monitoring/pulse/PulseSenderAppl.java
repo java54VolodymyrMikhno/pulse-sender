@@ -1,87 +1,97 @@
 package telran.monitoring.pulse;
+
 import java.net.*;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Random;
 import java.util.stream.IntStream;
 
 import telran.monitoring.pulse.dto.SensorData;
+
 public class PulseSenderAppl {
-	private static final int N_PACKETS = 200;
+	private static final int N_PACKETS = 100;
 	private static final long TIMEOUT = 500;
 	private static final int N_PATIENTS = 5;
 	private static final int MIN_PULSE_VALUE = 50;
 	private static final int MAX_PULSE_VALUE = 200;
-	private static final int JUMP_PROBABILITY = 15;
-	private static final int JUMP_POSITIVE_PROBABILITY=70;
-	private static final int MIN_JUMP_PERCENT=10;
-	private static final int MAX_JUMP_PERCENT=90;
-	private static final int MAX_NEGATIVE_JUMP_PERCENT = 50;
 	private static final String HOST = "localhost";
 	private static final int PORT = 5000;
+	private static final int JUMP_PROB = 15;
+	private static final int MIN_JUMP_PERCENT = 10;
+	private static final int MAX_JUMP_PERCENT = 100;
+	private static final int JUMP_POSITIVE_PROB = 70;
+	private static final int PATIENT_ID_PRINTED_VALUES = 3;
 	private static Random random = new Random();
+	private static HashMap<Long, Integer> patientIdPulseValue = new HashMap<>();
 	static DatagramSocket socket;
-	static Map<Long, Integer> previousValuePulse=new HashMap<>();
-	public static void main(String[] args) throws Exception{
+
+	public static void main(String[] args) throws Exception {
 		socket = new DatagramSocket();
-		IntStream.rangeClosed(1, N_PACKETS)
-		.forEach(PulseSenderAppl::sendPulse);
+		IntStream.rangeClosed(1, N_PACKETS).forEach(PulseSenderAppl::sendPulse);
 
 	}
+
 	static void sendPulse(int seqNumber) {
 		SensorData data = getRandomSensorData(seqNumber);
+		if (data.patientId() == PATIENT_ID_PRINTED_VALUES) {
+			System.out.printf("Pulse value of patient %d is %d\n", PATIENT_ID_PRINTED_VALUES, data.value());
+		}
 		String jsonData = data.toString();
 		sendDatagramPacket(jsonData);
 		try {
 			Thread.sleep(TIMEOUT);
 		} catch (InterruptedException e) {
-			
+
 		}
 	}
+
 	private static void sendDatagramPacket(String jsonData) {
-		byte [] buffer = jsonData.getBytes();
+		byte[] buffer = jsonData.getBytes();
 		try {
-			DatagramPacket packet =
-					new DatagramPacket(buffer, buffer.length,
-							InetAddress.getByName(HOST), PORT);
+			DatagramPacket packet = new DatagramPacket(buffer, buffer.length, InetAddress.getByName(HOST), PORT);
 			socket.send(packet);
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
-		
+
 	}
+
 	private static SensorData getRandomSensorData(int seqNumber) {
-		
+
 		long patientId = random.nextInt(1, N_PATIENTS + 1);
 		int value = getRandomPulseValue(patientId);
 		return new SensorData(seqNumber, patientId, value, System.currentTimeMillis());
 	}
+
 	private static int getRandomPulseValue(long patientId) {
-		int previosValue = previousValuePulse.getOrDefault(patientId, -1);
-		int result = (previosValue == -1) ? generateRandomPulse() : processPulseWithJump(previosValue);
-		previousValuePulse.put(patientId, result);
-
-		return result;
-	}
-	private static int processPulseWithJump(int prevValue) {
-		int newValue = prevValue;
-		if (isEventHappening(JUMP_PROBABILITY)) {
-			int sign = isEventHappening(JUMP_POSITIVE_PROBABILITY) ? 1 : -1;
-			int maxJumpPercent = (sign == -1) ? MAX_NEGATIVE_JUMP_PERCENT : MAX_JUMP_PERCENT;
-			int jumpPercent = random.nextInt(MIN_JUMP_PERCENT, maxJumpPercent);
-			int delta = prevValue * jumpPercent / 100;
-
-			 newValue = prevValue + (sign * delta);
-			newValue = clampPulseValue(newValue);
+		int valueRes = patientIdPulseValue.computeIfAbsent(patientId,
+				k -> random.nextInt(MIN_PULSE_VALUE, MAX_PULSE_VALUE + 1));
+		if (chance(JUMP_PROB)) {
+			valueRes = getValueWithJump(valueRes);
+			patientIdPulseValue.put(patientId, valueRes);
 		}
-		return newValue;
+
+		return valueRes;
 	}
-	private static int clampPulseValue(int newValue) {
-		return Math.max(MIN_PULSE_VALUE, Math.min(MAX_PULSE_VALUE, newValue));
+
+
+	private static int getValueWithJump(int previousValue) {
+		int jumpPercent = random.nextInt(MIN_JUMP_PERCENT, MAX_JUMP_PERCENT + 1);
+		int jumpValue = previousValue * jumpPercent / 100;
+		if (!chance(JUMP_POSITIVE_PROB)) {
+			jumpValue = -jumpValue;
+		}
+		int res = previousValue + jumpValue;
+		if (res < MIN_PULSE_VALUE) {
+			res = MIN_PULSE_VALUE;
+		} else if (res > MAX_PULSE_VALUE) {
+			res = MAX_PULSE_VALUE;
+		}
+		return res;
 	}
-	private static boolean isEventHappening(int jumpProbability) {
-		return random.nextInt(100) < jumpProbability;
-	}
-	private static int generateRandomPulse() {
-		return random.nextInt(MIN_PULSE_VALUE, MAX_PULSE_VALUE + 1);
+
+	private static boolean chance(int prob) {
+
+		return random.nextInt(0, 100) < prob;
 	}
 
 }

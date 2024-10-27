@@ -13,7 +13,7 @@ public class PulseSenderAppl {
 	private static final int N_PATIENTS = 5;
 	private static final int MIN_PULSE_VALUE = 50;
 	private static final int MAX_PULSE_VALUE = 200;
-	private static final String HOST = "localhost";
+	private static final String HOST = System.getenv().getOrDefault("HOST","localhost");
 	private static final int PORT = 5000;
 	private static final int JUMP_PROB = 15;
 	private static final int MIN_JUMP_PERCENT = 10;
